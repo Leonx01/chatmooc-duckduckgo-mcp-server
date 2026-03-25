@@ -6,6 +6,73 @@ A Model Context Protocol (MCP) server that provides web search capabilities thro
 
 Forked from [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) with LangGraph integration support.
 
+## 中文说明（重要信息）
+
+这是一个基于 **Model Context Protocol (MCP)** 的 DuckDuckGo 搜索服务，提供 **网页搜索** 与 **网页内容抓取** 两个工具，并内置速率限制与安全过滤配置，适合用于 Claude Desktop、Claude Code 或其他 MCP 客户端。
+
+### 快速开始
+```bash
+uvx duckduckgo-mcp-server
+```
+
+### 安装
+```bash
+uv pip install duckduckgo-mcp-server
+```
+
+### 运行方式与传输协议
+- 默认使用 `stdio`（Claude Desktop / Claude Code）
+- SSE：`uvx duckduckgo-mcp-server --transport sse`
+- Streamable HTTP（Docker/远程）：`uvx duckduckgo-mcp-server --transport streamable-http --host 0.0.0.0 --port 8000`
+
+### Claude Desktop 配置示例
+```json
+{
+    "mcpServers": {
+        "ddg-search": {
+            "command": "uvx",
+            "args": ["duckduckgo-mcp-server"],
+            "env": {
+                "DDG_SAFE_SEARCH": "STRICT",
+                "DDG_REGION": "cn-zh"
+            }
+        }
+    }
+}
+```
+
+### Claude Code 添加方式
+```bash
+claude mcp add ddg-search uvx duckduckgo-mcp-server
+```
+
+### LangGraph Client（含 HTTP）
+- 使用 `langchain-mcp-adapters` 的 `MultiServerMCPClient` 适配 LangGraph 客户端
+- 服务端传输参数为 `--transport streamable-http`，客户端使用 `transport: "streamable_http"`
+
+### 关键环境变量（启动时读取）
+- `DDG_SAFE_SEARCH`：`STRICT`（kp=1）/ `MODERATE`（kp=-1，默认）/ `OFF`（kp=-2）
+- `DDG_REGION`：默认地区/语言，如 `us-en`、`cn-zh`、`jp-ja`、`wt-wt`
+
+### 工具接口与限流
+- `search(query, max_results=10, region="")`：DuckDuckGo 搜索（默认 30 次/分钟）
+- `fetch_content(url, start_index=0, max_length=8000)`：网页正文提取（默认 20 次/分钟）
+
+### Docker 运行与访问
+```bash
+docker compose up --build -d
+# 或
+docker run -d -p 8000:8000 -e DDG_SAFE_SEARCH=MODERATE -e DDG_REGION= duckduckgo-mcp-server
+```
+MCP 端点：`http://localhost:8000/mcp`
+
+### 开发与测试
+```bash
+uv sync
+mcp dev src/duckduckgo_mcp_server/server.py
+uv run python -m pytest src/duckduckgo_mcp_server/ -v
+```
+
 ## Quick Start
 
 ```bash
@@ -118,7 +185,7 @@ docker run -d -p 8000:8000 \
 
 The MCP endpoint will be available at `http://localhost:8000/mcp`.
 
-## LangGraph Integration
+## LangGraph Client Integration
 
 This server fully supports integration with LangGraph agents via `langchain-mcp-adapters`.
 
@@ -197,6 +264,8 @@ asyncio.run(main())
 
 For connecting to a remote MCP server or Docker container:
 
+Note: the server CLI uses `--transport streamable-http`, while the client transport key is `streamable_http`.
+
 ```python
 import asyncio
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -228,32 +297,9 @@ async def main():
 asyncio.run(main())
 ```
 
-### Development
-
-For local development:
-
-```bash
-# Install dependencies
-uv sync
-
-# Run with the MCP Inspector
-mcp dev src/duckduckgo_mcp_server/server.py
-
-# Install locally for testing with Claude Desktop
-mcp install src/duckduckgo_mcp_server/server.py
-
-# Run all tests
-uv run python -m pytest src/duckduckgo_mcp_server/ -v
-
-# Run only unit tests
-uv run python -m pytest src/duckduckgo_mcp_server/test_server.py -v
-
-# Run only e2e tests
-uv run python -m pytest src/duckduckgo_mcp_server/test_e2e.py -v
-
-# Run LangGraph integration tests
-python tests/test_langgraph_integration.py
-```
+Runnable examples:
+- `tests/example_langgraph_direct.py`
+- `tests/example_langgraph_http.py`
 
 ## Available Tools
 
@@ -333,6 +379,33 @@ Cleaned and formatted text content from the webpage.
 - Comprehensive error catching and reporting
 - Detailed logging through MCP context
 - Graceful degradation on rate limits or timeouts
+
+## Development
+
+For local development:
+
+```bash
+# Install dependencies
+uv sync
+
+# Run with the MCP Inspector
+mcp dev src/duckduckgo_mcp_server/server.py
+
+# Install locally for testing with Claude Desktop
+mcp install src/duckduckgo_mcp_server/server.py
+
+# Run all tests
+uv run python -m pytest src/duckduckgo_mcp_server/ -v
+
+# Run only unit tests
+uv run python -m pytest src/duckduckgo_mcp_server/test_server.py -v
+
+# Run only e2e tests
+uv run python -m pytest src/duckduckgo_mcp_server/test_e2e.py -v
+
+# Run LangGraph integration tests
+python tests/test_langgraph_integration.py
+```
 
 ## Contributing
 
