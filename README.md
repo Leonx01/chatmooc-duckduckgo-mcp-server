@@ -1,10 +1,10 @@
-# DuckDuckGo Search MCP Server
+# ChatMooc DuckDuckGo Search MCP Server
 
-[![PyPI version](https://img.shields.io/pypi/v/duckduckgo-mcp-server)](https://pypi.org/project/duckduckgo-mcp-server/)
-[![PyPI downloads](https://img.shields.io/pypi/dm/duckduckgo-mcp-server)](https://pypi.org/project/duckduckgo-mcp-server/)
 [![Python versions](https://img.shields.io/pypi/pyversions/duckduckgo-mcp-server)](https://pypi.org/project/duckduckgo-mcp-server/)
 
 A Model Context Protocol (MCP) server that provides web search capabilities through DuckDuckGo, with additional features for content fetching and parsing.
+
+Forked from [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) with LangGraph integration support.
 
 ## Quick Start
 
@@ -19,6 +19,7 @@ uvx duckduckgo-mcp-server
 - **Rate Limiting**: Built-in protection against rate limits for both search and content fetching
 - **Error Handling**: Comprehensive error handling and logging
 - **LLM-Friendly Output**: Results formatted specifically for large language model consumption
+- **LangGraph Integration**: Full support for LangGraph agents via `langchain-mcp-adapters`
 
 ## Installation
 
@@ -101,6 +102,81 @@ uvx duckduckgo-mcp-server --transport streamable-http
 
 The default transport is `stdio`, which is used by Claude Desktop and Claude Code.
 
+## LangGraph Integration
+
+This server fully supports integration with LangGraph agents via `langchain-mcp-adapters`.
+
+### Installation
+
+```bash
+pip install langchain-mcp-adapters langgraph langchain-openai
+```
+
+### Quick Example
+
+```python
+import asyncio
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+
+async def main():
+    # Create MCP client connected to DuckDuckGo MCP server
+    client = MultiServerMCPClient(
+        connections={
+            "duckduckgo": {
+                "command": "uvx",
+                "args": ["duckduckgo-mcp-server"],
+                "transport": "stdio",
+            }
+        }
+    )
+
+    # Get MCP tools
+    tools = await client.get_tools()
+
+    # Create LangGraph ReAct agent
+    agent = create_react_agent(ChatOpenAI(model="gpt-4o-mini"), tools)
+
+    # Run search
+    result = await agent.ainvoke({
+        "messages": [{"role": "user", "content": "Search for the latest AI news"}]
+    })
+    print(result)
+
+asyncio.run(main())
+```
+
+### Direct Tool Usage (Without LLM)
+
+```python
+import asyncio
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+async def main():
+    client = MultiServerMCPClient(
+        connections={
+            "duckduckgo": {
+                "command": "uvx",
+                "args": ["duckduckgo-mcp-server"],
+                "transport": "stdio",
+            }
+        }
+    )
+
+    tools = await client.get_tools()
+    search_tool = next(t for t in tools if t.name == "search")
+
+    # Direct tool invocation
+    result = await search_tool.ainvoke({
+        "query": "Python asyncio tutorial",
+        "max_results": 5
+    })
+    print(result)
+
+asyncio.run(main())
+```
+
 ### Development
 
 For local development:
@@ -123,6 +199,9 @@ uv run python -m pytest src/duckduckgo_mcp_server/test_server.py -v
 
 # Run only e2e tests
 uv run python -m pytest src/duckduckgo_mcp_server/test_e2e.py -v
+
+# Run LangGraph integration tests
+python tests/test_langgraph_integration.py
 ```
 
 ## Available Tools
@@ -158,13 +237,15 @@ Formatted string containing search results with titles, URLs, and snippets.
 ### 2. Content Fetching Tool
 
 ```python
-async def fetch_content(url: str) -> str
+async def fetch_content(url: str, start_index: int = 0, max_length: int = 8000) -> str
 ```
 
 Fetches and parses content from a webpage.
 
 **Parameters:**
 - `url`: The webpage URL to fetch content from
+- `start_index`: Character offset to start reading from (default: 0)
+- `max_length`: Maximum number of characters to return (default: 8000)
 
 **Returns:**
 Cleaned and formatted text content from the webpage.
