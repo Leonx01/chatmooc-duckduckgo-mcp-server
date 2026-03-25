@@ -225,14 +225,6 @@ python tests/test_langgraph_integration.py
 - LangGraph 代理测试需要设置 `OPENAI_API_KEY`，否则只会运行工具加载测试。
 - 如果使用 HTTP 传输，请确保服务端以 `streamable-http` 启动，并访问 `/mcp` 端点。
 
-## 版权说明
-
-本项目遵循 MIT License（见 `LICENSE`）。原始版权归属：
-
-Copyright (c) 2025 Nick Clyde
-
-在此基础上的派生与修改版本同样遵循 MIT License 的条款。
-
 ## 致谢
 
 - [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) 原始项目
