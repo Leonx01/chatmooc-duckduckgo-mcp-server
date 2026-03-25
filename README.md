@@ -2,112 +2,53 @@
 
 [![Python versions](https://img.shields.io/pypi/pyversions/duckduckgo-mcp-server)](https://pypi.org/project/duckduckgo-mcp-server/)
 
-A Model Context Protocol (MCP) server that provides web search capabilities through DuckDuckGo, with additional features for content fetching and parsing.
+## 项目简介
 
-Forked from [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) with LangGraph integration support.
+这是一个基于 **Model Context Protocol (MCP)** 的 DuckDuckGo 搜索服务，提供 **网页搜索** 与 **网页内容抓取** 两个工具，并内置速率限制与安全过滤配置。项目使用 FastMCP 框架构建，适用于 Claude Desktop、Claude Code 或其他 MCP 客户端。
 
-## 中文说明（重要信息）
+本仓库基于 [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) 派生，增加了 LangGraph Client 适配以及 HTTP 传输支持的示例与说明。
 
-这是一个基于 **Model Context Protocol (MCP)** 的 DuckDuckGo 搜索服务，提供 **网页搜索** 与 **网页内容抓取** 两个工具，并内置速率限制与安全过滤配置，适合用于 Claude Desktop、Claude Code 或其他 MCP 客户端。
+## 功能特性
 
-### 快速开始
-```bash
-uvx duckduckgo-mcp-server
-```
+- DuckDuckGo 网页搜索（解析 HTML 结果）
+- 网页正文抓取（移除脚本/样式/导航等非正文元素）
+- 速率限制：搜索 30 次/分钟，抓取 20 次/分钟
+- SafeSearch 与地区/语言配置
+- 适配 LangGraph 客户端（支持 stdio 与 HTTP 连接）
 
-### 安装
-```bash
-uv pip install duckduckgo-mcp-server
-```
+## 架构概览
 
-### 运行方式与传输协议
-- 默认使用 `stdio`（Claude Desktop / Claude Code）
-- SSE：`uvx duckduckgo-mcp-server --transport sse`
-- Streamable HTTP（Docker/远程）：`uvx duckduckgo-mcp-server --transport streamable-http --host 0.0.0.0 --port 8000`
+核心实现位于 `src/duckduckgo_mcp_server/server.py`：
 
-### Claude Desktop 配置示例
-```json
-{
-    "mcpServers": {
-        "ddg-search": {
-            "command": "uvx",
-            "args": ["duckduckgo-mcp-server"],
-            "env": {
-                "DDG_SAFE_SEARCH": "STRICT",
-                "DDG_REGION": "cn-zh"
-            }
-        }
-    }
-}
-```
+- `DuckDuckGoSearcher`：向 `https://html.duckduckgo.com/html` 发送 POST 请求并解析结果
+- `WebContentFetcher`：抓取网页并提取纯文本内容（默认最大 8000 字符）
+- `RateLimiter`：滑动窗口限流
 
-### Claude Code 添加方式
-```bash
-claude mcp add ddg-search uvx duckduckgo-mcp-server
-```
+对外暴露两个 MCP 工具：`search` 与 `fetch_content`。
 
-### LangGraph Client（含 HTTP）
-- 使用 `langchain-mcp-adapters` 的 `MultiServerMCPClient` 适配 LangGraph 客户端
-- 服务端传输参数为 `--transport streamable-http`，客户端使用 `transport: "streamable_http"`
-
-### 关键环境变量（启动时读取）
-- `DDG_SAFE_SEARCH`：`STRICT`（kp=1）/ `MODERATE`（kp=-1，默认）/ `OFF`（kp=-2）
-- `DDG_REGION`：默认地区/语言，如 `us-en`、`cn-zh`、`jp-ja`、`wt-wt`
-
-### 工具接口与限流
-- `search(query, max_results=10, region="")`：DuckDuckGo 搜索（默认 30 次/分钟）
-- `fetch_content(url, start_index=0, max_length=8000)`：网页正文提取（默认 20 次/分钟）
-
-### Docker 运行与访问
-```bash
-docker compose up --build -d
-# 或
-docker run -d -p 8000:8000 -e DDG_SAFE_SEARCH=MODERATE -e DDG_REGION= duckduckgo-mcp-server
-```
-MCP 端点：`http://localhost:8000/mcp`
-
-### 开发与测试
-```bash
-uv sync
-mcp dev src/duckduckgo_mcp_server/server.py
-uv run python -m pytest src/duckduckgo_mcp_server/ -v
-```
-
-## Quick Start
+## 快速开始
 
 ```bash
 uvx duckduckgo-mcp-server
 ```
 
-## Features
-
-- **Web Search**: Search DuckDuckGo with advanced rate limiting and result formatting
-- **Content Fetching**: Retrieve and parse webpage content with intelligent text extraction
-- **Rate Limiting**: Built-in protection against rate limits for both search and content fetching
-- **Error Handling**: Comprehensive error handling and logging
-- **LLM-Friendly Output**: Results formatted specifically for large language model consumption
-- **LangGraph Integration**: Full support for LangGraph agents via `langchain-mcp-adapters`
-
-## Installation
-
-Install from PyPI using `uv`:
+## 安装
 
 ```bash
 uv pip install duckduckgo-mcp-server
 ```
 
-## Usage
+## 使用方式
 
-### Running with Claude Desktop
+### Claude Desktop
 
-1. Download [Claude Desktop](https://claude.ai/download)
-2. Create or edit your Claude Desktop configuration:
-   - On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+配置文件路径：
 
-Add the following configuration:
+- macOS：`~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows：`%APPDATA%\Claude\claude_desktop_config.json`
 
-**Basic Configuration (No SafeSearch, No Default Region):**
+基础配置：
+
 ```json
 {
     "mcpServers": {
@@ -119,7 +60,8 @@ Add the following configuration:
 }
 ```
 
-**With SafeSearch and Region Configuration:**
+带 SafeSearch 和地区配置：
+
 ```json
 {
     "mcpServers": {
@@ -135,47 +77,115 @@ Add the following configuration:
 }
 ```
 
-**Configuration Options:**
-- `DDG_SAFE_SEARCH`: SafeSearch filtering level (optional)
-  - `STRICT`: Maximum content filtering (kp=1)
-  - `MODERATE`: Balanced filtering (kp=-1, default if not specified)
-  - `OFF`: No content filtering (kp=-2)
-- `DDG_REGION`: Default region/language code (optional, examples below)
-  - `us-en`: United States (English)
-  - `cn-zh`: China (Chinese)
-  - `jp-ja`: Japan (Japanese)
-  - `wt-wt`: No specific region
-  - Leave empty for DuckDuckGo's default behavior
+修改配置后请重启 Claude Desktop。
 
-3. Restart Claude Desktop
-
-### Running with Claude Code
-
-1. Download [Claude Code](https://github.com/anthropics/claude-code)
-2. Ensure [`uvenv`](https://github.com/robinvandernoord/uvenv) is installed and the `uvx` command is available
-3. Add the MCP server: `claude mcp add ddg-search uvx duckduckgo-mcp-server`
-
-### Running with SSE or Streamable HTTP
-
-The server supports alternative transports for use with other MCP clients:
+### Claude Code
 
 ```bash
-# SSE transport
+claude mcp add ddg-search uvx duckduckgo-mcp-server
+```
+
+## 传输方式（Transport）
+
+默认使用 `stdio`。如需 HTTP 传输，可选择 SSE 或 Streamable HTTP。
+
+```bash
+# SSE
 uvx duckduckgo-mcp-server --transport sse
 
-# Streamable HTTP transport (for Docker/remote deployment)
+# Streamable HTTP（适合 Docker/远程）
 uvx duckduckgo-mcp-server --transport streamable-http --host 0.0.0.0 --port 8000
 ```
 
-The default transport is `stdio`, which is used by Claude Desktop and Claude Code.
+HTTP 端点为：`http://localhost:8000/mcp`。
 
-### Running with Docker
+## LangGraph Client 适配
+
+通过 `langchain-mcp-adapters` 的 `MultiServerMCPClient` 即可接入 LangGraph。
+
+注意命名差异：
+
+- 服务端 CLI 传输参数：`--transport streamable-http`
+- 客户端 transport 键：`streamable_http`
+
+### stdio 示例
+
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+client = MultiServerMCPClient(
+    connections={
+        "duckduckgo": {
+            "command": "uvx",
+            "args": ["duckduckgo-mcp-server"],
+            "transport": "stdio",
+        }
+    }
+)
+```
+
+### HTTP 示例
+
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+client = MultiServerMCPClient(
+    connections={
+        "duckduckgo": {
+            "transport": "streamable_http",
+            "url": "http://localhost:8000/mcp",
+        }
+    }
+)
+```
+
+可参考示例文件：
+
+- `tests/example_langgraph_direct.py`
+- `tests/example_langgraph_http.py`
+- `tests/test_langgraph_integration.py`
+
+## MCP 工具说明
+
+### 1) search
+
+```python
+async def search(query: str, max_results: int = 10, region: str = "") -> str
+```
+
+参数说明：
+
+- `query`：搜索关键词
+- `max_results`：最多返回结果数（默认 10，建议 1-20）
+- `region`：地区/语言代码（可覆盖默认值）
+
+返回值为格式化文本，包含标题、链接与摘要。
+
+### 2) fetch_content
+
+```python
+async def fetch_content(url: str, start_index: int = 0, max_length: int = 8000) -> str
+```
+
+参数说明：
+
+- `url`：网页 URL（需以 http/https 开头）
+- `start_index`：内容起始字符位置（分页使用）
+- `max_length`：最大返回字符数（默认 8000）
+
+返回值为清洗后的正文文本，并附带分页元信息。
+
+## 配置项（启动时读取）
+
+- `DDG_SAFE_SEARCH`：`STRICT` / `MODERATE`（默认）/ `OFF`
+- `DDG_REGION`：默认地区/语言代码，例如 `us-en`、`cn-zh`、`jp-ja`、`wt-wt`
+
+## Docker 运行
 
 ```bash
-# Build and run
 docker compose up --build -d
 
-# Or with plain Docker
+# 或使用原生 Docker
 docker build -t duckduckgo-mcp-server .
 docker run -d -p 8000:8000 \
   -e DDG_SAFE_SEARCH=MODERATE \
@@ -183,238 +193,48 @@ docker run -d -p 8000:8000 \
   duckduckgo-mcp-server
 ```
 
-The MCP endpoint will be available at `http://localhost:8000/mcp`.
-
-## LangGraph Client Integration
-
-This server fully supports integration with LangGraph agents via `langchain-mcp-adapters`.
-
-### Installation
+## 开发与测试
 
 ```bash
-pip install langchain-mcp-adapters langgraph langchain-openai
-```
-
-### Quick Example
-
-```python
-import asyncio
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
-from langchain_openai import ChatOpenAI
-
-async def main():
-    # Create MCP client connected to DuckDuckGo MCP server
-    client = MultiServerMCPClient(
-        connections={
-            "duckduckgo": {
-                "command": "uvx",
-                "args": ["duckduckgo-mcp-server"],
-                "transport": "stdio",
-            }
-        }
-    )
-
-    # Get MCP tools
-    tools = await client.get_tools()
-
-    # Create LangGraph ReAct agent
-    agent = create_react_agent(ChatOpenAI(model="gpt-4o-mini"), tools)
-
-    # Run search
-    result = await agent.ainvoke({
-        "messages": [{"role": "user", "content": "Search for the latest AI news"}]
-    })
-    print(result)
-
-asyncio.run(main())
-```
-
-### Direct Tool Usage (Without LLM)
-
-```python
-import asyncio
-from langchain_mcp_adapters.client import MultiServerMCPClient
-
-async def main():
-    client = MultiServerMCPClient(
-        connections={
-            "duckduckgo": {
-                "command": "uvx",
-                "args": ["duckduckgo-mcp-server"],
-                "transport": "stdio",
-            }
-        }
-    )
-
-    tools = await client.get_tools()
-    search_tool = next(t for t in tools if t.name == "search")
-
-    # Direct tool invocation
-    result = await search_tool.ainvoke({
-        "query": "Python asyncio tutorial",
-        "max_results": 5
-    })
-    print(result)
-
-asyncio.run(main())
-```
-
-### HTTP Transport (Docker/Remote)
-
-For connecting to a remote MCP server or Docker container:
-
-Note: the server CLI uses `--transport streamable-http`, while the client transport key is `streamable_http`.
-
-```python
-import asyncio
-from langchain_mcp_adapters.client import MultiServerMCPClient
-
-async def main():
-    # Connect to MCP server via HTTP transport
-    client = MultiServerMCPClient(
-        connections={
-            "duckduckgo": {
-                "transport": "streamable_http",
-                "url": "http://localhost:8000/mcp",
-                # Optional: Add headers for authentication
-                # "headers": {
-                #     "Authorization": "Bearer YOUR_TOKEN"
-                # }
-            }
-        }
-    )
-
-    tools = await client.get_tools()
-    search_tool = next(t for t in tools if t.name == "search")
-
-    result = await search_tool.ainvoke({
-        "query": "latest AI news",
-        "max_results": 5
-    })
-    print(result)
-
-asyncio.run(main())
-```
-
-Runnable examples:
-- `tests/example_langgraph_direct.py`
-- `tests/example_langgraph_http.py`
-
-## Available Tools
-
-### 1. Search Tool
-
-```python
-async def search(query: str, max_results: int = 10, region: str = "") -> str
-```
-
-Performs a web search on DuckDuckGo and returns formatted results.
-
-**Parameters:**
-- `query`: Search query string
-- `max_results`: Maximum number of results to return (default: 10)
-- `region`: (Optional) Region/language code to override the default. Leave empty to use the configured default region.
-
-**Region Code Examples:**
-- `us-en`: United States (English)
-- `cn-zh`: China (Chinese)
-- `jp-ja`: Japan (Japanese)
-- `de-de`: Germany (German)
-- `fr-fr`: France (French)
-- `wt-wt`: No specific region
-
-**Returns:**
-Formatted string containing search results with titles, URLs, and snippets.
-
-**Example Usage:**
-- Search with default settings: `search("python tutorial")`
-- Search with specific region: `search("latest news", region="jp-ja")` for Japanese news
-
-### 2. Content Fetching Tool
-
-```python
-async def fetch_content(url: str, start_index: int = 0, max_length: int = 8000) -> str
-```
-
-Fetches and parses content from a webpage.
-
-**Parameters:**
-- `url`: The webpage URL to fetch content from
-- `start_index`: Character offset to start reading from (default: 0)
-- `max_length`: Maximum number of characters to return (default: 8000)
-
-**Returns:**
-Cleaned and formatted text content from the webpage.
-
-## Features in Detail
-
-### Rate Limiting
-
-- Search: Limited to 30 requests per minute
-- Content Fetching: Limited to 20 requests per minute
-- Automatic queue management and wait times
-
-### Result Processing
-
-- Removes ads and irrelevant content
-- Cleans up DuckDuckGo redirect URLs
-- Formats results for optimal LLM consumption
-- Truncates long content appropriately
-
-### Content Safety
-
-- **SafeSearch Filtering**: Configured at server startup via `DDG_SAFE_SEARCH` environment variable
-  - Controlled by administrators, not modifiable by AI assistants
-  - Filters inappropriate content based on the selected level
-  - Uses DuckDuckGo's official `kp` parameter
-
-- **Region Localization**:
-  - Default region set via `DDG_REGION` environment variable
-  - Can be overridden per search request by AI assistants
-  - Improves result relevance for specific geographic regions
-
-### Error Handling
-
-- Comprehensive error catching and reporting
-- Detailed logging through MCP context
-- Graceful degradation on rate limits or timeouts
-
-## Development
-
-For local development:
-
-```bash
-# Install dependencies
+# 安装依赖
 uv sync
 
-# Run with the MCP Inspector
+# 本地运行
+uv run duckduckgo-mcp-server
+
+# MCP Inspector
 mcp dev src/duckduckgo_mcp_server/server.py
 
-# Install locally for testing with Claude Desktop
-mcp install src/duckduckgo_mcp_server/server.py
-
-# Run all tests
+# 全部测试
 uv run python -m pytest src/duckduckgo_mcp_server/ -v
 
-# Run only unit tests
+# 单元测试
 uv run python -m pytest src/duckduckgo_mcp_server/test_server.py -v
 
-# Run only e2e tests
+# E2E 测试
 uv run python -m pytest src/duckduckgo_mcp_server/test_e2e.py -v
 
-# Run LangGraph integration tests
+# LangGraph 集成测试（需要 OPENAI_API_KEY）
 python tests/test_langgraph_integration.py
 ```
 
-## Contributing
+## 常见问题
 
-Issues and pull requests are welcome! Some areas for potential improvement:
+- LangGraph 代理测试需要设置 `OPENAI_API_KEY`，否则只会运行工具加载测试。
+- 如果使用 HTTP 传输，请确保服务端以 `streamable-http` 启动，并访问 `/mcp` 端点。
 
-- Enhanced content parsing options
-- Caching layer for frequently accessed content
-- Additional rate limiting strategies
+## 版权说明
 
-## License
+本项目遵循 MIT License（见 `LICENSE`）。原始版权归属：
 
-This project is licensed under the MIT License.
+Copyright (c) 2025 Nick Clyde
+
+在此基础上的派生与修改版本同样遵循 MIT License 的条款。
+
+## 致谢
+
+- [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) 原始项目
+- DuckDuckGo 搜索服务
+- MCP 与 FastMCP 框架
+- `httpx`、`beautifulsoup4` 等关键依赖
+- LangGraph 与 `langchain-mcp-adapters`
