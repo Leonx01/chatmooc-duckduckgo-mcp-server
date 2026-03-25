@@ -8,6 +8,21 @@
 
 本仓库基于 [nickclyde/duckduckgo-mcp-server](https://github.com/nickclyde/duckduckgo-mcp-server) 派生，增加了 LangGraph Client 适配以及 HTTP 传输支持的示例与说明。
 
+## Docker 部署（推荐）
+
+```bash
+docker compose up --build -d
+
+# 或使用原生 Docker
+docker build -t duckduckgo-mcp-server .
+docker run -d -p 8000:8000 \
+  -e DDG_SAFE_SEARCH=MODERATE \
+  -e DDG_REGION= \
+  duckduckgo-mcp-server
+```
+
+HTTP 端点：`http://localhost:8000/mcp`
+
 ## 功能特性
 
 - DuckDuckGo 网页搜索（解析 HTML 结果）
@@ -179,19 +194,6 @@ async def fetch_content(url: str, start_index: int = 0, max_length: int = 8000) 
 
 - `DDG_SAFE_SEARCH`：`STRICT` / `MODERATE`（默认）/ `OFF`
 - `DDG_REGION`：默认地区/语言代码，例如 `us-en`、`cn-zh`、`jp-ja`、`wt-wt`
-
-## Docker 运行
-
-```bash
-docker compose up --build -d
-
-# 或使用原生 Docker
-docker build -t duckduckgo-mcp-server .
-docker run -d -p 8000:8000 \
-  -e DDG_SAFE_SEARCH=MODERATE \
-  -e DDG_REGION= \
-  duckduckgo-mcp-server
-```
 
 ## 开发与测试
 
