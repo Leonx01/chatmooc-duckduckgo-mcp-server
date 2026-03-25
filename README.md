@@ -96,11 +96,27 @@ The server supports alternative transports for use with other MCP clients:
 # SSE transport
 uvx duckduckgo-mcp-server --transport sse
 
-# Streamable HTTP transport
-uvx duckduckgo-mcp-server --transport streamable-http
+# Streamable HTTP transport (for Docker/remote deployment)
+uvx duckduckgo-mcp-server --transport streamable-http --host 0.0.0.0 --port 8000
 ```
 
 The default transport is `stdio`, which is used by Claude Desktop and Claude Code.
+
+### Running with Docker
+
+```bash
+# Build and run
+docker compose up --build -d
+
+# Or with plain Docker
+docker build -t duckduckgo-mcp-server .
+docker run -d -p 8000:8000 \
+  -e DDG_SAFE_SEARCH=MODERATE \
+  -e DDG_REGION= \
+  duckduckgo-mcp-server
+```
+
+The MCP endpoint will be available at `http://localhost:8000/mcp`.
 
 ## LangGraph Integration
 
@@ -170,6 +186,41 @@ async def main():
     # Direct tool invocation
     result = await search_tool.ainvoke({
         "query": "Python asyncio tutorial",
+        "max_results": 5
+    })
+    print(result)
+
+asyncio.run(main())
+```
+
+### HTTP Transport (Docker/Remote)
+
+For connecting to a remote MCP server or Docker container:
+
+```python
+import asyncio
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+async def main():
+    # Connect to MCP server via HTTP transport
+    client = MultiServerMCPClient(
+        connections={
+            "duckduckgo": {
+                "transport": "streamable_http",
+                "url": "http://localhost:8000/mcp",
+                # Optional: Add headers for authentication
+                # "headers": {
+                #     "Authorization": "Bearer YOUR_TOKEN"
+                # }
+            }
+        }
+    )
+
+    tools = await client.get_tools()
+    search_tool = next(t for t in tools if t.name == "search")
+
+    result = await search_tool.ainvoke({
+        "query": "latest AI news",
         "max_results": 5
     })
     print(result)
